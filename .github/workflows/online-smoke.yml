@@ -11,13 +11,22 @@ on:
 
 jobs:
   smoke:
-    if: ${{ github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Print trigger context
+        shell: bash
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "deployment_state=${{ github.event.deployment_status.state }}"
+          echo "deployment_environment=${{ github.event.deployment.environment }}"
+          echo "deployment_environment_url=${{ github.event.deployment_status.environment_url }}"
+          echo "deployment_target_url=${{ github.event.deployment_status.target_url }}"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -46,7 +55,22 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
+
+      - name: Wait for URL readiness
+        shell: bash
+        run: |
+          URL="${{ steps.target.outputs.url }}"
+          for i in {1..24}; do
+            if curl -fsSIL --max-time 10 "$URL" >/dev/null; then
+              echo "Target is ready: $URL"
+              exit 0
+            fi
+            echo "Waiting target... attempt $i/24"
+            sleep 5
+          done
+          echo "Target not ready: $URL"
+          exit 1
 
       - name: Run online smoke
         env:
