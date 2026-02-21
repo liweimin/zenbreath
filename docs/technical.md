@@ -1,12 +1,20 @@
 # ZenBreath 技术文档
 
 ## 1. 实现概览
-当前版本采用单文件前端实现：`ZenBreath.html`，包含结构、样式和脚本。  
+当前版本采用“单页面 + 多脚本模块”实现。  
 核心技术：
 - UI 样式：Tailwind CDN + 自定义 CSS。
 - 动画与渲染：CSS Transition/Keyframes + Canvas 粒子。
 - 音频：Web Audio API（环境噪声实时合成 + 阶段提示音）。
 - 状态驱动：原生 JavaScript 状态机。
+
+模块入口：
+- `js/state.js`：共享状态、DOM 引用、兼容全局变量、`window.__qa__` 读模型
+- `js/visual.js`：背景切换、语录、粒子系统
+- `js/audio.js`：环境音引擎、提示音、音量控制
+- `js/session.js`：四段相位状态机、倒计时、会话启停
+- `js/ui.js`：设置面板和控件交互
+- `js/main.js`：初始化编排
 
 ## 2. 逻辑架构
 - UI 层  
@@ -21,6 +29,9 @@
 - 音频引擎层  
   环境音生成、滤波、音量包络、相位提示音合成。
 
+- 观测层  
+  `window.__qa__` 暴露只读健康数据，供自动化测试读取运行状态。
+
 ## 3. 关键状态变量
 - `isSessionActive`：会话是否运行中。
 - `durations`：四段秒数配置（`inhale/hold1/exhale/hold2`）。
@@ -28,6 +39,9 @@
 - `endlessMode`：是否无尽模式。
 - `currentAmbientType`：当前环境音类型。
 - `particleMode`：粒子行为模式（`idle/attract/repel/scatterWait`）。
+- `currentPhase`：当前呼吸相位。
+- `countdownRemaining`：当前相位剩余秒数。
+- `lastAudioError`：音频或运行异常的最后错误快照。
 
 ## 4. 核心流程
 ### 4.1 启动流程
@@ -78,12 +92,12 @@
 - 呼吸核心：人形 SVG + 光环 + 中央文本倒计时。
 
 ## 7. 已知约束
-- 代码集中在单文件，不利于单元测试和模块复用。
+- 当前仍是纯前端静态实现，无后端存储与鉴权。
 - 依赖 Tailwind CDN，适合原型与本地调试，不适合严格生产部署。
 - 音频体验受浏览器自动播放策略与设备输出链影响。
 
 ## 8. 建议的工程化演进
-1. 按模块拆分为 `ui/session/audio/visual` 四个脚本文件。
-2. 引入 `qa` 测试开关（只在测试模式暴露内部状态只读接口）。
-3. 建立 `npm` 脚本统一执行 lint + e2e + 报告导出。
+1. 从脚本模块继续演进到 ES Module + 构建工具（Vite）。
+2. 将 `window.__qa__` 迁移为受控开关（仅测试环境暴露）。
+3. 建立统一 CI 门禁：本地回归 + 线上 smoke + 人工最小验收。
 4. 增加基础错误遥测（控制台错误收集 + 会话状态快照）。

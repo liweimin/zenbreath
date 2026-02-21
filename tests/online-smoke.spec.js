@@ -41,6 +41,7 @@ async function snapshot(page) {
       ambientGain: safe(() => (ambientGainNode ? ambientGainNode.gain.value : null)),
       statusText: document.getElementById("status-text")?.innerText || "",
       globalTimerText: document.getElementById("global-timer")?.innerText || "",
+      qa: safe(() => window.__qa__, null),
     };
   });
 }
@@ -62,6 +63,8 @@ test("ONLINE-SMOKE 生产站点关键链路可用", async ({ page }) => {
   expect(snap.isSessionActive).toBe(true);
   expect(snap.statusText).not.toBe("起息");
   expect(snap.audioCtxState === "running" || snap.audioCtxState === "suspended").toBeTruthy();
+  expect(snap.qa).not.toBeNull();
+  expect(snap.qa.session.active).toBe(true);
 
   // 会话中直接切换环境音链路，避免打开设置面板导致自动暂停会话
   await page.evaluate(() => {
@@ -95,12 +98,14 @@ test("ONLINE-SMOKE 生产站点关键链路可用", async ({ page }) => {
   expect(onSnap.ambientGain).not.toBeNull();
   expect(offSnap.ambientGain).toBeLessThan(0.03);
   expect(onSnap.ambientGain).toBeGreaterThan(0.02);
+  expect(onSnap.qa.audio.ambientType).toBe("void");
 
   // 保持会话继续运行
   await page.waitForTimeout(1000);
   snap = await snapshot(page);
   expect(snap.isSessionActive).toBe(true);
   expect(snap.globalTimerText.length).toBeGreaterThan(0);
+  expect(typeof snap.qa.timers.phaseCountdown).toBe("number");
 
   watcher.detach();
   expect(criticalLogs(watcher.logs)).toEqual([]);

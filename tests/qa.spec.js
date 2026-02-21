@@ -58,6 +58,7 @@ async function getSnapshot(page) {
         w: window.innerWidth,
         h: window.innerHeight,
       },
+      qa: safe(() => window.__qa__, null),
     };
   });
 }
@@ -336,6 +337,67 @@ test("TC-013 Resize 后粒子画布尺寸保持一致", async ({ page }) => {
   const snap = await getSnapshot(page);
   expect(snap.canvasSize.w).toBe(snap.viewportSize.w);
   expect(snap.canvasSize.h).toBe(snap.viewportSize.h);
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-014 __qa__ 暴露会话与音频健康信息", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.click("#start-btn");
+  await page.waitForTimeout(900);
+
+  const snap = await getSnapshot(page);
+  expect(snap.qa).not.toBeNull();
+  expect(snap.qa.session.active).toBe(true);
+  expect(typeof snap.qa.session.currentPhase).toBe("string");
+  expect(snap.qa.audio.ctxState === "running" || snap.qa.audio.ctxState === "suspended").toBeTruthy();
+  expect(typeof snap.qa.audio.ambientType).toBe("string");
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-015 __qa__ 可反映环境音类型与增益变化", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.click("#start-btn");
+  await page.waitForTimeout(1000);
+
+  await page.evaluate(() => {
+    switchAmbientNoise("fire");
+    document.getElementById("audio-toggle").checked = false;
+    updateAudioVolume();
+  });
+  await page.waitForTimeout(700);
+  let snap = await getSnapshot(page);
+  expect(snap.qa.audio.ambientType).toBe("fire");
+  expect(snap.qa.audio.gain).toBeLessThan(0.03);
+
+  await page.evaluate(() => {
+    document.getElementById("audio-toggle").checked = true;
+    updateAudioVolume();
+  });
+  await page.waitForTimeout(1200);
+  snap = await getSnapshot(page);
+  expect(snap.qa.audio.gain).toBeGreaterThan(0.02);
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-016 __qa__ 计时字段在无尽模式下有效", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.click('button.timer-btn[data-time="0"]');
+  await page.click("#start-btn");
+  await page.waitForTimeout(1500);
+
+  const snap = await getSnapshot(page);
+  expect(snap.qa.session.endlessMode).toBe(true);
+  expect(typeof snap.qa.timers.phaseCountdown).toBe("number");
+  expect(snap.qa.timers.globalText).toContain("深 空 无 尽");
 
   watcher.detach();
   expect(criticalLogs(watcher.logs)).toEqual([]);

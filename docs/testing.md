@@ -43,7 +43,7 @@
 - 控制台监听（收集 `error/warn`）。
 - 页面内探针（测试模式读取关键运行状态）。
 
-建议新增测试模式（例如 `?qa=1`）暴露只读对象 `window.__qa__`：
+系统已提供只读对象 `window.__qa__`：
 
 - `session`: `isSessionActive`, `currentPhase`, `remainingSessionTime`
 - `audio`: `audioCtxState`, `ambientType`, `ambientGainValue`, `lastAudioError`
@@ -69,6 +69,9 @@
 | TC-011 | P1  | 是   | 提示音触发（吸/呼/屏息）                          | 每阶段有可检测瞬态能量                |
 | TC-012 | P2  | 是   | 背景图加载失败降级                              | 回退到渐变背景，不影响会话              |
 | TC-013 | P2  | 是   | 窗口 resize 后粒子与布局                       | 不错位、不抛错                    |
+| TC-014 | P0  | 是   | `__qa__` 暴露会话与音频健康字段                 | 会话、音频字段存在且与运行状态一致         |
+| TC-015 | P0  | 是   | `__qa__` 反映环境音类型与增益变化                | 切换和开关后 `ambientType/gain` 正确变化 |
+| TC-016 | P1  | 是   | `__qa__` 计时字段在无尽模式可读取                 | `phaseCountdown/globalText` 有效       |
 
 
 ## 5. 一键验证流程（建议）
@@ -86,6 +89,12 @@
 - CI 工作流：`.github/workflows/online-smoke.yml`
 - 触发方式：Vercel 部署成功自动触发，或 GitHub Actions 手动输入 URL 触发
 - 如果本地外网受限，先设置代理（示例：`http://127.0.0.1:7897`）再执行 `npm run test:online-smoke`
+
+命令约定：
+
+- 本地回归：`npm run test:e2e`
+- 本地 + 线上用例全跑：`npm run test:e2e:all`
+- 线上 smoke：`npm run test:online-smoke`
 
 ## 6. 最小必要人工测试范围
 
