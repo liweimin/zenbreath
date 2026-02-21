@@ -1,6 +1,7 @@
 (function bootstrapMain(ns) {
   function init() {
     ns.initDomRefs();
+    ns.persistence.loadPersisted();
     ns.exposeLegacyGlobals();
     ns.visual.initVisual();
     ns.session.initSession();

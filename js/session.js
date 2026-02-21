@@ -261,6 +261,10 @@
     }
 
     if (state.isSessionActive) {
+      const elapsed = state.sessionStartedAt > 0 ? (Date.now() - state.sessionStartedAt) / 1000 : 0;
+      state.sessionStartedAt = 0;
+      ns.persistence.recordSessionMetrics(elapsed);
+
       state.isSessionActive = false;
       state.currentPhase = "idle";
       clearTimeout(state.phaseTimer);
@@ -288,7 +292,12 @@
       return;
     }
 
+    if (ns.ui && typeof ns.ui.persistCurrentSettings === "function") {
+      ns.ui.persistCurrentSettings();
+    }
+
     state.isSessionActive = true;
+    state.sessionStartedAt = Date.now();
     dom.startHint.style.opacity = 0;
     dom.globalTimer.style.opacity = 1;
 
@@ -312,6 +321,10 @@
   }
 
   function endSession() {
+    const elapsed = state.sessionStartedAt > 0 ? (Date.now() - state.sessionStartedAt) / 1000 : 0;
+    state.sessionStartedAt = 0;
+    ns.persistence.recordSessionMetrics(elapsed);
+
     state.isSessionActive = false;
     state.currentPhase = "idle";
     clearTimeout(state.phaseTimer);

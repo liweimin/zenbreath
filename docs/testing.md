@@ -48,6 +48,8 @@
 - `session`: `isSessionActive`, `currentPhase`, `remainingSessionTime`
 - `audio`: `audioCtxState`, `ambientType`, `ambientGainValue`, `lastAudioError`
 - `timers`: 当前阶段倒计时、全局倒计时
+- `insights`: `sessionsToday`, `totalMinutesToday`
+- `saved`: `hasLastSettings`
 
 这样自动化可以“看见内部状态”，不需要靠猜 UI。
 
@@ -72,6 +74,9 @@
 | TC-014 | P0  | 是   | `__qa__` 暴露会话与音频健康字段                 | 会话、音频字段存在且与运行状态一致         |
 | TC-015 | P0  | 是   | `__qa__` 反映环境音类型与增益变化                | 切换和开关后 `ambientType/gain` 正确变化 |
 | TC-016 | P1  | 是   | `__qa__` 计时字段在无尽模式可读取                 | `phaseCountdown/globalText` 有效       |
+| TC-017 | P0  | 是   | 上次设置持久化与继续按钮可用                       | 刷新后可恢复配置，继续按钮可点击        |
+| TC-018 | P0  | 是   | 今日练习统计在会话结束后累加                       | `sessions/minutes` 增长且 UI 更新       |
+| TC-019 | P1  | 是   | 移动端设置面板与继续按钮显示可用                    | `390x844` 下无溢出，可交互              |
 
 
 ## 5. 一键验证流程（建议）

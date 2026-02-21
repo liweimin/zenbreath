@@ -1,6 +1,7 @@
 (function bootstrapAudio(ns) {
   const state = ns.state;
   const dom = ns.dom;
+  let fadingChains = [];
 
   function syncAmbientButtons() {
     document.querySelectorAll(".ambient-btn").forEach((btn) => {
@@ -28,6 +29,7 @@
   }
 
   function safeDisconnectAmbientNodes() {
+    clearFadingChains();
     if (state.ambientNode) {
       try {
         state.ambientNode.stop();
@@ -43,13 +45,60 @@
       state.ambientGainNode.disconnect();
       state.ambientGainNode = null;
     }
+    if (state.ambientFilterNode) {
+      state.ambientFilterNode.disconnect();
+      state.ambientFilterNode = null;
+    }
+  }
+
+  function stopAndDisconnectChain(chain) {
+    if (!chain) return;
+    if (chain.windModTimer) {
+      clearInterval(chain.windModTimer);
+      chain.windModTimer = null;
+    }
+    try {
+      if (chain.node) chain.node.stop();
+    } catch (_) {}
+    if (chain.node) chain.node.disconnect();
+    if (chain.gainNode) chain.gainNode.disconnect();
+    if (chain.filter) chain.filter.disconnect();
+  }
+
+  function clearFadingChains() {
+    for (const chain of fadingChains) {
+      if (chain && chain.disposeTimer) {
+        clearTimeout(chain.disposeTimer);
+      }
+      stopAndDisconnectChain(chain);
+    }
+    fadingChains = [];
+  }
+
+  function fadeOutAndDisposeChain(chain) {
+    if (!chain || !state.audioCtx || !chain.node) return null;
+    const now = state.audioCtx.currentTime;
+    if (chain.windModTimer) clearInterval(chain.windModTimer);
+    if (chain.gainNode) {
+      chain.gainNode.gain.cancelScheduledValues(now);
+      chain.gainNode.gain.setTargetAtTime(0, now, 0.08);
+    }
+    chain.disposeTimer = setTimeout(() => {
+      stopAndDisconnectChain(chain);
+    }, 500);
+    return chain;
   }
 
   function switchAmbientNoise(type) {
     if (!state.audioCtx) return;
     state.currentAmbientType = type;
 
-    safeDisconnectAmbientNodes();
+    const oldChain = {
+      node: state.ambientNode,
+      gainNode: state.ambientGainNode,
+      filter: state.ambientFilterNode || null,
+      windModTimer: state.windModTimer || null,
+    };
 
     const bufferSize = state.audioCtx.sampleRate * 2;
     const buffer = state.audioCtx.createBuffer(1, bufferSize, state.audioCtx.sampleRate);
@@ -81,11 +130,12 @@
       output[i] = Math.max(-1, Math.min(1, sample));
     }
 
-    state.ambientNode = state.audioCtx.createBufferSource();
-    state.ambientNode.buffer = buffer;
-    state.ambientNode.loop = true;
+    const nextNode = state.audioCtx.createBufferSource();
+    nextNode.buffer = buffer;
+    nextNode.loop = true;
 
     const filter = state.audioCtx.createBiquadFilter();
+    let nextWindModTimer = null;
     if (type === "earth") {
       filter.type = "lowpass";
       filter.frequency.value = 140;
@@ -102,7 +152,7 @@
       const baseFreq = 600;
       const sweep = 120;
       let phase = 0;
-      state.windModTimer = setInterval(() => {
+      nextWindModTimer = setInterval(() => {
         if (!state.audioCtx) return;
         phase += 0.08;
         const nextFreq = Math.max(120, baseFreq + Math.sin(phase) * sweep);
@@ -113,13 +163,22 @@
       filter.frequency.value = 3500;
     }
 
-    state.ambientGainNode = state.audioCtx.createGain();
-    state.ambientGainNode.gain.value = 0;
+    const nextGainNode = state.audioCtx.createGain();
+    nextGainNode.gain.value = 0;
 
-    state.ambientNode.connect(filter);
-    filter.connect(state.ambientGainNode);
-    state.ambientGainNode.connect(state.audioCtx.destination);
-    state.ambientNode.start();
+    nextNode.connect(filter);
+    filter.connect(nextGainNode);
+    nextGainNode.connect(state.audioCtx.destination);
+    nextNode.start();
+
+    state.ambientNode = nextNode;
+    state.ambientGainNode = nextGainNode;
+    state.ambientFilterNode = filter;
+    state.windModTimer = nextWindModTimer;
+
+    clearFadingChains();
+    const fadingChain = fadeOutAndDisposeChain(oldChain);
+    if (fadingChain) fadingChains.push(fadingChain);
 
     updateAudioVolume();
     syncAmbientButtons();

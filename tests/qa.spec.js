@@ -59,6 +59,8 @@ async function getSnapshot(page) {
         h: window.innerHeight,
       },
       qa: safe(() => window.__qa__, null),
+      insightsText: document.getElementById("insights-text")?.innerText || "",
+      continueBtnDisabled: !!document.getElementById("continue-last-btn")?.disabled,
     };
   });
 }
@@ -398,6 +400,76 @@ test("TC-016 __qa__ 计时字段在无尽模式下有效", async ({ page }) => {
   expect(snap.qa.session.endlessMode).toBe(true);
   expect(typeof snap.qa.timers.phaseCountdown).toBe("number");
   expect(snap.qa.timers.globalText).toContain("深 空 无 尽");
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-017 上次设置可持久化并启用继续按钮", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: "domcontentloaded" });
+
+  await page.click('button.mode-btn[data-mode="4-7-8-0"]');
+  await page.click('button.timer-btn[data-time="10"]');
+  await page.click('button.ambient-btn[data-ambient="water"]');
+  await page.evaluate(() => {
+    document.getElementById("volume-slider").value = "55";
+    document.getElementById("audio-toggle").checked = true;
+    updateAudioVolume();
+  });
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(300);
+  const snap = await getSnapshot(page);
+
+  expect(snap.qa.saved.hasLastSettings).toBe(true);
+  expect(snap.continueBtnDisabled).toBe(false);
+  expect(snap.durations).toEqual({ inhale: 4, hold1: 7, exhale: 8, hold2: 0 });
+  expect(snap.qa.audio.ambientType).toBe("water");
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-018 今日练习统计会在会话结束后累加", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: "domcontentloaded" });
+
+  await page.click("#start-btn");
+  await page.waitForTimeout(900);
+  await page.evaluate(() => {
+    // 人工设置开始时间，避免测试等待过久
+    ZenBreath.state.sessionStartedAt = Date.now() - 125000;
+    toggleSession();
+  });
+  await page.waitForTimeout(500);
+
+  const snap = await getSnapshot(page);
+  expect(snap.qa.insights.sessionsToday).toBeGreaterThanOrEqual(1);
+  expect(snap.qa.insights.totalMinutesToday).toBeGreaterThanOrEqual(2);
+  expect(snap.insightsText).toContain("今 日");
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-019 移动端设置面板与新增按钮可用", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+
+  const panel = page.locator("#settings-panel");
+  const continueBtn = page.locator("#continue-last-btn");
+  await expect(panel).toBeVisible();
+  await expect(continueBtn).toBeVisible();
+
+  const box = await panel.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box.width).toBeLessThanOrEqual(390);
 
   watcher.detach();
   expect(criticalLogs(watcher.logs)).toEqual([]);
