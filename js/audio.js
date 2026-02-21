@@ -1,7 +1,39 @@
 (function bootstrapAudio(ns) {
   const state = ns.state;
   const dom = ns.dom;
+
+  const AMBIENT_SAMPLE_FILES = {
+    earth: "./assets/audio/ambient/stream.mp3",
+    water: "./assets/audio/ambient/light-rain.mp3",
+    fire: "./assets/audio/ambient/rain.mp3",
+    wind: "./assets/audio/ambient/wind.mp3",
+    void: "./assets/audio/ambient/thunder-rain.mp3",
+  };
+
+  const AMBIENT_SAMPLE_GAIN = {
+    earth: 0.95,
+    water: 0.75,
+    fire: 0.7,
+    wind: 0.8,
+    void: 0.65,
+  };
+
+  const CUE_SAMPLE_FILES = {
+    inhale: "./assets/audio/cues/inhale_qing.wav",
+    hold: "./assets/audio/cues/hold_waterdrop.wav",
+    exhale: "./assets/audio/cues/exhale_drum.wav",
+  };
+
+  const CUE_SAMPLE_GAIN = {
+    inhale: 1.0,
+    hold: 1.0,
+    exhale: 1.0,
+  };
+
   let fadingChains = [];
+  let sampleLoadPromise = null;
+  const ambientBuffers = {};
+  const cueBuffers = {};
 
   function syncAmbientButtons() {
     document.querySelectorAll(".ambient-btn").forEach((btn) => {
@@ -15,17 +47,82 @@
     });
   }
 
+  async function decodeBufferFromURL(url) {
+    if (!state.audioCtx) return null;
+    const resp = await fetch(url, { cache: "force-cache" });
+    if (!resp.ok) throw new Error(`Failed to fetch audio: ${url}`);
+    const arr = await resp.arrayBuffer();
+    return state.audioCtx.decodeAudioData(arr.slice(0));
+  }
+
+  async function ensureSampleBuffersLoaded() {
+    if (!state.audioCtx) return;
+    if (sampleLoadPromise) return sampleLoadPromise;
+    if (window.location && window.location.protocol === "file:") {
+      sampleLoadPromise = Promise.resolve();
+      return sampleLoadPromise;
+    }
+
+    const ambientTasks = Object.entries(AMBIENT_SAMPLE_FILES).map(async ([key, url]) => {
+      try {
+        ambientBuffers[key] = await decodeBufferFromURL(url);
+      } catch (e) {
+        ambientBuffers[key] = null;
+        console.warn(`ambient sample load failed: ${key}`, e);
+      }
+    });
+
+    const cueTasks = Object.entries(CUE_SAMPLE_FILES).map(async ([key, url]) => {
+      try {
+        cueBuffers[key] = await decodeBufferFromURL(url);
+      } catch (e) {
+        cueBuffers[key] = null;
+        console.warn(`cue sample load failed: ${key}`, e);
+      }
+    });
+
+    sampleLoadPromise = Promise.all([...ambientTasks, ...cueTasks]).catch((e) => {
+      state.lastAudioError = `Sample loading failed: ${e && e.message ? e.message : String(e)}`;
+    });
+
+    return sampleLoadPromise;
+  }
+
   function initAudio() {
     if (state.isAudioInitialized) return;
     try {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       state.audioCtx = new AudioContextCtor();
       state.isAudioInitialized = true;
-      switchAmbientNoise(state.currentAmbientType);
+      ensureSampleBuffersLoaded().finally(() => {
+        switchAmbientNoise(state.currentAmbientType);
+      });
     } catch (e) {
       state.lastAudioError = `Web Audio init failed: ${e && e.message ? e.message : String(e)}`;
       console.warn("Web Audio API not supported", e);
     }
+  }
+
+  function stopAndDisconnectChain(chain) {
+    if (!chain) return;
+    if (chain.windModTimer) {
+      clearInterval(chain.windModTimer);
+      chain.windModTimer = null;
+    }
+    try {
+      if (chain.node) chain.node.stop();
+    } catch (_) {}
+    if (chain.node) chain.node.disconnect();
+    if (chain.gainNode) chain.gainNode.disconnect();
+    if (chain.filter) chain.filter.disconnect();
+  }
+
+  function clearFadingChains() {
+    for (const chain of fadingChains) {
+      if (chain && chain.disposeTimer) clearTimeout(chain.disposeTimer);
+      stopAndDisconnectChain(chain);
+    }
+    fadingChains = [];
   }
 
   function safeDisconnectAmbientNodes() {
@@ -51,30 +148,6 @@
     }
   }
 
-  function stopAndDisconnectChain(chain) {
-    if (!chain) return;
-    if (chain.windModTimer) {
-      clearInterval(chain.windModTimer);
-      chain.windModTimer = null;
-    }
-    try {
-      if (chain.node) chain.node.stop();
-    } catch (_) {}
-    if (chain.node) chain.node.disconnect();
-    if (chain.gainNode) chain.gainNode.disconnect();
-    if (chain.filter) chain.filter.disconnect();
-  }
-
-  function clearFadingChains() {
-    for (const chain of fadingChains) {
-      if (chain && chain.disposeTimer) {
-        clearTimeout(chain.disposeTimer);
-      }
-      stopAndDisconnectChain(chain);
-    }
-    fadingChains = [];
-  }
-
   function fadeOutAndDisposeChain(chain) {
     if (!chain || !state.audioCtx || !chain.node) return null;
     const now = state.audioCtx.currentTime;
@@ -89,17 +162,19 @@
     return chain;
   }
 
-  function switchAmbientNoise(type) {
-    if (!state.audioCtx) return;
-    state.currentAmbientType = type;
+  function createAmbientSourceFromBuffer(buffer) {
+    const node = state.audioCtx.createBufferSource();
+    node.buffer = buffer;
+    node.loop = true;
+    const gainNode = state.audioCtx.createGain();
+    gainNode.gain.value = 0;
+    node.connect(gainNode);
+    gainNode.connect(state.audioCtx.destination);
+    node.start();
+    return { node, gainNode };
+  }
 
-    const oldChain = {
-      node: state.ambientNode,
-      gainNode: state.ambientGainNode,
-      filter: state.ambientFilterNode || null,
-      windModTimer: state.windModTimer || null,
-    };
-
+  function switchAmbientNoiseSynth(type, oldChain) {
     const bufferSize = state.audioCtx.sampleRate * 2;
     const buffer = state.audioCtx.createBuffer(1, bufferSize, state.audioCtx.sampleRate);
     const output = buffer.getChannelData(0);
@@ -158,7 +233,7 @@
         const nextFreq = Math.max(120, baseFreq + Math.sin(phase) * sweep);
         filter.frequency.setTargetAtTime(nextFreq, state.audioCtx.currentTime, 0.12);
       }, 80);
-    } else if (type === "void") {
+    } else {
       filter.type = "highpass";
       filter.frequency.value = 3500;
     }
@@ -175,10 +250,39 @@
     state.ambientGainNode = nextGainNode;
     state.ambientFilterNode = filter;
     state.windModTimer = nextWindModTimer;
+    state.currentAmbientEngine = "synth";
 
     clearFadingChains();
     const fadingChain = fadeOutAndDisposeChain(oldChain);
     if (fadingChain) fadingChains.push(fadingChain);
+  }
+
+  function switchAmbientNoise(type) {
+    if (!state.audioCtx) return;
+    state.currentAmbientType = type;
+
+    const oldChain = {
+      node: state.ambientNode,
+      gainNode: state.ambientGainNode,
+      filter: state.ambientFilterNode || null,
+      windModTimer: state.windModTimer || null,
+    };
+
+    const sampleBuffer = ambientBuffers[type];
+    if (sampleBuffer) {
+      const next = createAmbientSourceFromBuffer(sampleBuffer);
+      state.ambientNode = next.node;
+      state.ambientGainNode = next.gainNode;
+      state.ambientFilterNode = null;
+      state.windModTimer = null;
+      state.currentAmbientEngine = "sample";
+
+      clearFadingChains();
+      const fadingChain = fadeOutAndDisposeChain(oldChain);
+      if (fadingChain) fadingChains.push(fadingChain);
+    } else {
+      switchAmbientNoiseSynth(type, oldChain);
+    }
 
     updateAudioVolume();
     syncAmbientButtons();
@@ -194,24 +298,46 @@
     state.ambientGainNode.gain.cancelScheduledValues(now);
 
     let vMult = 0.6;
-    if (state.currentAmbientType === "earth") vMult = 1.4;
-    if (state.currentAmbientType === "fire") vMult = 0.8;
-    if (state.currentAmbientType === "wind") vMult = 1.0;
-    if (state.currentAmbientType === "void") vMult = 0.4;
+    if (state.currentAmbientEngine === "sample") {
+      vMult = AMBIENT_SAMPLE_GAIN[state.currentAmbientType] || 0.75;
+    } else {
+      if (state.currentAmbientType === "earth") vMult = 1.4;
+      if (state.currentAmbientType === "fire") vMult = 0.8;
+      if (state.currentAmbientType === "wind") vMult = 1.0;
+      if (state.currentAmbientType === "void") vMult = 0.4;
+    }
 
     if (isEnabled && state.isSessionActive) {
-      state.ambientGainNode.gain.setTargetAtTime(volume * vMult, now, 0.4);
+      state.ambientGainNode.gain.setTargetAtTime(volume * vMult, now, 0.35);
     } else {
       state.ambientGainNode.gain.setTargetAtTime(0, now, 0.2);
     }
   }
 
-  function playChime(phase) {
-    if (!state.audioCtx || !dom.audioToggle.checked) return;
-    if (state.audioCtx.state === "suspended") {
-      state.audioCtx.resume();
-    }
+  function playSampleCue(phase) {
+    const key = phase === "inhale" ? "inhale" : (phase === "exhale" ? "exhale" : "hold");
+    const buffer = cueBuffers[key];
+    if (!buffer || !state.audioCtx) return false;
 
+    const volumeSlider = parseInt(dom.volumeSlider.value, 10) / 100;
+    const gainNode = state.audioCtx.createGain();
+    const source = state.audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    const baseGain = volumeSlider * (CUE_SAMPLE_GAIN[key] || 1);
+    const now = state.audioCtx.currentTime;
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(Math.min(1, baseGain), now + 0.02);
+    gainNode.gain.setTargetAtTime(0.001, now + Math.max(0.25, buffer.duration * 0.6), 0.35);
+
+    source.connect(gainNode);
+    gainNode.connect(state.audioCtx.destination);
+    source.start(now + 0.005);
+    source.stop(now + buffer.duration + 0.1);
+    return true;
+  }
+
+  function playSynthCue(phase) {
     const now = state.audioCtx.currentTime;
     const volumeSlider = parseInt(dom.volumeSlider.value, 10) / 100;
 
@@ -280,12 +406,26 @@
     osc2.stop(now + 5);
   }
 
+  function playChime(phase) {
+    if (!state.audioCtx || !dom.audioToggle.checked) return;
+    if (state.audioCtx.state === "suspended") state.audioCtx.resume();
+
+    if (state.cueMode === "sample") {
+      const ok = playSampleCue(phase);
+      if (ok) return;
+    }
+
+    playSynthCue(phase);
+  }
+
   ns.audio = {
     initAudio,
     switchAmbientNoise,
     updateAudioVolume,
     playChime,
     syncAmbientButtons,
+    ensureSampleBuffersLoaded,
+    safeDisconnectAmbientNodes,
   };
 
   // Keep compatibility with existing tests/tools.

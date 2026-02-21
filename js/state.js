@@ -30,6 +30,8 @@
     isAudioInitialized: false,
     ambientTypes,
     currentAmbientType: ambientTypes[Math.floor(Math.random() * ambientTypes.length)],
+    currentAmbientEngine: "sample",
+    cueMode: "sample",
     lastAudioError: null,
 
     // Session state
@@ -108,10 +110,11 @@
     const timerMode = typeof settings.timerMode === "string" ? settings.timerMode : "5";
     const customMinutes = Math.max(1, Math.min(120, parseInt(settings.customMinutes, 10) || 15));
     const ambientType = ambientTypes.includes(settings.ambientType) ? settings.ambientType : ns.state.currentAmbientType;
+    const cueMode = settings.cueMode === "synth" ? "synth" : "sample";
     const audioEnabled = settings.audioEnabled !== false;
     const volume = Math.max(0, Math.min(100, parseInt(settings.volume, 10) || 30));
 
-    return { mode, customDurations, timerMode, customMinutes, ambientType, audioEnabled, volume };
+    return { mode, customDurations, timerMode, customMinutes, ambientType, cueMode, audioEnabled, volume };
   }
 
   function ensureMetricsCurrentDay() {
@@ -203,6 +206,8 @@
           audio: {
             ctxState: state.audioCtx ? state.audioCtx.state : null,
             ambientType: state.currentAmbientType,
+            ambientEngine: state.currentAmbientEngine,
+            cueMode: state.cueMode,
             gain: state.ambientGainNode ? state.ambientGainNode.gain.value : null,
             lastError: state.lastAudioError,
           },

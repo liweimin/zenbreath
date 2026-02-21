@@ -137,6 +137,22 @@
     if (state.isAudioInitialized) ns.audio.switchAmbientNoise(ambient);
   }
 
+  function setCueMode(cueMode) {
+    const nextMode = cueMode === "synth" ? "synth" : "sample";
+    state.cueMode = nextMode;
+
+    document.querySelectorAll(".cue-mode-btn").forEach((b) => {
+      b.classList.remove("bg-white/20", "text-white", "shadow-sm");
+      b.classList.add("text-white/60");
+    });
+
+    const active = document.querySelector(`.cue-mode-btn[data-cue-mode="${nextMode}"]`);
+    if (active) {
+      active.classList.add("bg-white/20", "text-white", "shadow-sm");
+      active.classList.remove("text-white/60");
+    }
+  }
+
   function setAudioControls(audioEnabled, volume) {
     dom.audioToggle.checked = audioEnabled !== false;
     dom.volumeSlider.value = Math.max(0, Math.min(100, parseInt(volume, 10) || 30));
@@ -155,6 +171,7 @@
       timerMode: getActiveTimerMode(),
       customMinutes: parseInt(document.getElementById("custom-minutes").value, 10) || 15,
       ambientType: state.currentAmbientType,
+      cueMode: state.cueMode,
       audioEnabled: dom.audioToggle.checked,
       volume: parseInt(dom.volumeSlider.value, 10) || 30,
     };
@@ -167,6 +184,7 @@
     setMode(settings.mode, settings.customDurations);
     setTimerMode(settings.timerMode, settings.customMinutes);
     setAmbient(settings.ambientType);
+    setCueMode(settings.cueMode);
     setAudioControls(settings.audioEnabled, settings.volume);
     persistCurrentSettings();
   }
@@ -221,6 +239,15 @@
     ambientBtns.forEach((btn) => {
       btn.addEventListener("click", (e) => {
         setAmbient(e.target.dataset.ambient);
+        persistCurrentSettings();
+      });
+    });
+  }
+
+  function setupCueModeButtons() {
+    document.querySelectorAll(".cue-mode-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        setCueMode(e.target.dataset.cueMode);
         persistCurrentSettings();
       });
     });
@@ -285,7 +312,9 @@
     setupModeButtons();
     setupTimerButtons();
     setupAmbientButtons();
+    setupCueModeButtons();
     ns.audio.syncAmbientButtons();
+    setCueMode(state.cueMode);
     ns.persistence.updateInsightsUI();
     refreshContinueButton();
   }

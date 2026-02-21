@@ -361,24 +361,37 @@
                     <div class="flex flex-col gap-6">
                         <!-- 环境音选择 -->
                         <div>
-                            <label class="block text-xs text-brand-light/60 mb-3 tracking-widest uppercase">环境声场
+                            <label class="block text-xs text-brand-light/60 mb-3 tracking-widest uppercase">自然声场
                                 (初次随机)</label>
                             <div class="flex bg-black/30 rounded-xl p-1 gap-1 border border-white/5 shadow-inner">
                                 <button
                                     class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
-                                    data-ambient="earth">地</button>
+                                    data-ambient="earth">溪流</button>
                                 <button
                                     class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
-                                    data-ambient="water">水</button>
+                                    data-ambient="water">细雨</button>
                                 <button
                                     class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
-                                    data-ambient="fire">火</button>
+                                    data-ambient="fire">雨幕</button>
                                 <button
                                     class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
-                                    data-ambient="wind">风</button>
+                                    data-ambient="wind">山风</button>
                                 <button
                                     class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
-                                    data-ambient="void">空</button>
+                                    data-ambient="void">雷雨</button>
+                            </div>
+                        </div>
+
+                        <!-- 提示音模式 -->
+                        <div>
+                            <label class="block text-xs text-brand-light/60 mb-3 tracking-widest uppercase">提示音风格</label>
+                            <div class="flex bg-black/30 rounded-xl overflow-hidden p-1 gap-1 border border-white/5">
+                                <button
+                                    class="cue-mode-btn flex-1 bg-white/20 text-white rounded-lg py-1.5 text-sm duration-300 shadow-sm"
+                                    data-cue-mode="sample">真实采样</button>
+                                <button
+                                    class="cue-mode-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-1.5 text-sm duration-300"
+                                    data-cue-mode="synth">合成</button>
                             </div>
                         </div>
 

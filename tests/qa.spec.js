@@ -474,3 +474,75 @@ test("TC-019 移动端设置面板与新增按钮可用", async ({ page }) => {
   watcher.detach();
   expect(criticalLogs(watcher.logs)).toEqual([]);
 });
+
+test("TC-020 提示音模式可在真实采样和合成间切换", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+
+  await page.click('button.cue-mode-btn[data-cue-mode="synth"]');
+  await page.click('button.cue-mode-btn[data-cue-mode="sample"]');
+  await page.click("#start-btn");
+  await page.waitForTimeout(1200);
+
+  const snap = await getSnapshot(page);
+  expect(snap.qa.audio.cueMode).toBe("sample");
+  expect(snap.isSessionActive).toBe(true);
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-021 默认提示音模式为真实采样", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  const snap = await getSnapshot(page);
+  expect(snap.qa.audio.cueMode).toBe("sample");
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-022 真实采样模式下三段提示音触发不报错", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.click('button.cue-mode-btn[data-cue-mode="sample"]');
+  await page.click("#start-btn");
+  await page.waitForTimeout(1000);
+
+  const result = await page.evaluate(() => {
+    try {
+      playChime("inhale");
+      playChime("hold1");
+      playChime("exhale");
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  expect(result).toBe(true);
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
+
+test("TC-023 会话中切换提示音模式不会中断", async ({ page }) => {
+  const watcher = captureLogs(page);
+  await page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+  await page.click("#start-btn");
+  await page.waitForTimeout(1000);
+
+  await page.click("#settings-btn");
+  await page.click('button.cue-mode-btn[data-cue-mode="synth"]');
+  await page.waitForTimeout(200);
+  await page.click('button.cue-mode-btn[data-cue-mode="sample"]');
+  await page.waitForTimeout(200);
+  await page.click("#start-btn");
+  await page.waitForTimeout(800);
+
+  const snap = await getSnapshot(page);
+  expect(snap.isSessionActive).toBe(true);
+  expect(snap.qa.audio.cueMode).toBe("sample");
+
+  watcher.detach();
+  expect(criticalLogs(watcher.logs)).toEqual([]);
+});
