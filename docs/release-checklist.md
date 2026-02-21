@@ -2,7 +2,8 @@
 
 ## 1. 提交前
 - 自动化测试通过：`npm run test:e2e`
-- 检查文档更新：需求/技术/测试/发布说明/测试报告
+- 检查文档更新：需求/技术/测试/发布说明/测试报告（遵循 `docs/DOCS-RULES.md`）
+- 更新统一历史迭代文档：`docs/CHANGELOG.md`
 - 检查忽略文件：`node_modules/`, `test-results/`, `.vercel/`
 
 ## 2. 版本控制

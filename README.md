@@ -23,6 +23,8 @@ npm run test:online-smoke
 ```
 
 ## Docs
+- `docs/DOCS-RULES.md`
+- `docs/CHANGELOG.md`
 - `docs/requirements.md`
 - `docs/technical.md`
 - `docs/testing.md`
