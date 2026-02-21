@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenBreath - 正念呼吸</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            light: '#e0ece4',
+                            DEFAULT: '#799351',
+                            dark: '#3b5249'
+                        }
+                    },
+                    animation: {
+                        'spin-slow': 'spin 25s linear infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-12px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: transparent;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* 动态背景交替渲染 */
+        #bg-container {
+            position: absolute;
+            top: -5%;
+            left: -5%;
+            width: 110%;
+            height: 110%;
+            z-index: -3;
+            overflow: hidden;
+        }
+
+        .bg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 4s ease-in-out;
+            transform: scale(1.05);
+        }
+
+        .bg-layer.active {
+            opacity: 1;
+            /* 赋予微距推拉效果 Ken Burns effect */
+            animation: slow-pan 30s linear infinite alternate;
+        }
+
+        @keyframes slow-pan {
+            0% {
+                transform: scale(1.02) translate(0, 0);
+            }
+
+            100% {
+                transform: scale(1.08) translate(-1%, -1%);
+            }
+        }
+
+        /* 全屏高级暗色遮罩 */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(5, 15, 10, 0.6) 0%, rgba(5, 5, 10, 0.85) 100%);
+            z-index: -2;
+            backdrop-filter: blur(3px);
+            /* 提升质感 */
+            -webkit-backdrop-filter: blur(3px);
+            opacity: 1;
+            transition: opacity 2s ease-in-out;
+        }
+
+        /* 呼吸球体组 */
+        .breath-container {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .aura-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform ease-in-out, opacity ease-in-out, box-shadow ease-in-out;
+            pointer-events: none;
+        }
+
+        #aura-1 {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 70%);
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.05);
+        }
+
+        #aura-2 {
+            width: 82%;
+            height: 82%;
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            animation: spin-slow 25s linear infinite;
+        }
+
+        #breath-circle {
+            position: relative;
+            width: 50vmin;
+            height: 50vmin;
+            border-radius: 50%;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform ease-in-out, opacity ease-in-out;
+            z-index: 10;
+        }
+
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .glass-panel {
+            background: rgba(15, 20, 15, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 粒子画布 */
+        #particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* 优雅的自定义滚动条，防止内容过多时溢出 */
+        #settings-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #settings-panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+
+        #settings-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        #settings-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .quote-transition {
+            transition: opacity 2s ease-in-out, transform 2s ease-out;
+        }
+    </style>
+</head>
+
+<body class="bg-black overflow-hidden m-0 h-screen w-screen font-sans flex flex-col relative"
+    style="font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+
+    <!-- 全局剩余时间展示 -->
+    <div id="global-timer"
+        class="absolute top-8 left-1/2 transform -translate-x-1/2 text-white/40 tracking-[0.3em] font-extralight text-sm opacity-0 transition-opacity duration-1000 z-30 pointer-events-none">
+        深空无尽
+    </div>
+
+    <!-- 动态背景层 (交替切换) -->
+    <div id="bg-container">
+        <div id="bg-layer-1" class="bg-layer active"></div>
+        <div id="bg-layer-2" class="bg-layer"></div>
+    </div>
+    <div class="overlay"></div>
+    <canvas id="particles"></canvas>
+
+    <!-- 顶部控制面板栏 -->
+    <div class="absolute top-8 right-8 z-50">
+        <button id="settings-btn"
+            class="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md transition-all text-white/70 hover:text-white hover:scale-105 active:scale-95 shadow-xl"
+            aria-label="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </button>
+
+        <!-- 全屏居中设置面板遮罩层 -->
+        <div id="settings-overlay"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md transition-all duration-400 opacity-100 pointer-events-auto">
+            <!-- 弹窗面板本体 -->
+            <div id="settings-panel"
+                class="w-[660px] max-w-[92vw] max-h-[90vh] overflow-y-auto glass-panel rounded-3xl p-6 md:p-8 flex flex-col gap-6 transform transition-all duration-400 scale-100 shadow-2xl relative">
+
+                <div
+                    class="text-white/90 font-light text-xl tracking-[0.2em] text-center border-b border-white/10 pb-4">
+                    环境与节奏设定
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <!-- 左列：模式与节奏 -->
+                    <div class="flex flex-col gap-6">
+                        <!-- 模式选择 -->
+                        <div>
+                            <label class="block text-xs text-brand-light/60 mb-3 tracking-widest uppercase">呼吸律动</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button
+                                    class="mode-btn bg-white/20 text-white rounded-xl py-2 text-sm transition-all border border-white/10 shadow-sm"
+                                    data-mode="4-4-4-4">箱式 (4-4-4-4)</button>
+                                <button
+                                    class="mode-btn bg-white/5 text-white/60 rounded-xl py-2 text-sm hover:bg-white/10 transition-all border border-transparent"
+                                    data-mode="4-7-8-0">助眠 (4-7-8)</button>
+                                <button
+                                    class="mode-btn bg-white/5 text-white/60 rounded-xl py-2 text-sm hover:bg-white/10 transition-all border border-transparent"
+                                    data-mode="5-0-5-0">谐振 (5-5)</button>
+                                <button
+                                    class="mode-btn bg-white/5 text-white/60 rounded-xl py-2 text-sm hover:bg-white/10 transition-all border border-transparent"
+                                    data-mode="custom">自定义四段</button>
+                            </div>
+                        </div>
+
+                        <!-- 自定义时间输入 -->
+                        <div id="custom-inputs"
+                            class="hidden grid-cols-4 gap-2 bg-black/30 p-3 rounded-xl border border-white/5">
+                            <div class="flex flex-col items-center">
+                                <div class="text-[11px] text-white/50 mb-1">吸气</div>
+                                <input type="number" id="in-time" value="4" min="0" max="20"
+                                    class="w-full bg-white/10 border border-white/10 rounded-lg p-2 text-center text-white text-sm focus:outline-none focus:border-white/40 transition-colors">
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="text-[11px] text-white/50 mb-1">屏息</div>
+                                <input type="number" id="hold1-time" value="4" min="0" max="30"
+                                    class="w-full bg-white/10 border border-white/10 rounded-lg p-2 text-center text-white text-sm focus:outline-none focus:border-white/40 transition-colors">
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="text-[11px] text-white/50 mb-1">吐气</div>
+                                <input type="number" id="out-time" value="4" min="0" max="30"
+                                    class="w-full bg-white/10 border border-white/10 rounded-lg p-2 text-center text-white text-sm focus:outline-none focus:border-white/40 transition-colors">
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="text-[11px] text-white/50 mb-1">屏息</div>
+                                <input type="number" id="hold2-time" value="4" min="0" max="30"
+                                    class="w-full bg-white/10 border border-white/10 rounded-lg p-2 text-center text-white text-sm focus:outline-none focus:border-white/40 transition-colors">
+                            </div>
+                        </div>
+
+                        <!-- 时长选择 -->
+                        <div>
+                            <label
+                                class="block text-xs text-brand-light/60 mb-3 tracking-widest uppercase">练习总时长</label>
+                            <div class="flex bg-black/30 rounded-xl overflow-hidden p-1 gap-1 border border-white/5">
+                                <button
+                                    class="timer-btn flex-1 bg-white/20 text-white rounded-lg py-1.5 text-sm duration-300 shadow-sm"
+                                    data-time="5">5 分</button>
+                                <button
+                                    class="timer-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-1.5 text-sm duration-300"
+                                    data-time="10">10 分</button>
+                                <button
+                                    class="timer-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-1.5 text-sm duration-300"
+                                    data-time="custom">自定义</button>
+                                <button
+                                    class="timer-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-1.5 text-sm duration-300"
+                                    data-time="0">无尽</button>
+                            </div>
+                        </div>
+
+                        <!-- 自定义时长输入 (隐藏态) -->
+                        <div id="custom-timer-input"
+                            class="hidden flex-col items-center bg-black/30 p-3 rounded-xl border border-white/5 mt-[-10px]">
+                            <div class="text-[11px] text-white/50 mb-2">输入练习时间 (分钟)</div>
+                            <input type="number" id="custom-minutes" value="15" min="1" max="120"
+                                class="w-full bg-white/10 border border-white/10 rounded-lg p-2 text-center text-white text-sm focus:outline-none focus:border-white/40 transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- 右列：环境与时间 -->
+                    <div class="flex flex-col gap-6">
+                        <!-- 环境音选择 -->
+                        <div>
+                            <label class="block text-xs text-brand-light/60 mb-3 tracking-widest uppercase">环境声场
+                                (初次随机)</label>
+                            <div class="flex bg-black/30 rounded-xl p-1 gap-1 border border-white/5 shadow-inner">
+                                <button
+                                    class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
+                                    data-ambient="earth">地</button>
+                                <button
+                                    class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
+                                    data-ambient="water">水</button>
+                                <button
+                                    class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
+                                    data-ambient="fire">火</button>
+                                <button
+                                    class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
+                                    data-ambient="wind">风</button>
+                                <button
+                                    class="ambient-btn flex-1 text-white/60 hover:bg-white/10 hover:text-white rounded-lg py-2 md:py-1.5 text-xs duration-300"
+                                    data-ambient="void">空</button>
+                            </div>
+                        </div>
+
+                        <!-- 音频开关与音量 -->
+                        <div class="mt-2">
+                            <div class="flex items-center justify-between mb-3">
+                                <label class="text-xs text-brand-light/60 tracking-widest uppercase">沉浸声频音量</label>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="audio-toggle" class="sr-only peer" checked>
+                                    <div
+                                        class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600">
+                                    </div>
+                                </label>
+                            </div>
+                            <div
+                                class="flex items-center gap-3 bg-black/30 px-3 py-3 md:py-2 rounded-xl border border-white/5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white/40" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                </svg>
+                                <input type="range" id="volume-slider" min="0" max="100" value="40"
+                                    class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-green-600 flex-1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 开始按钮 -->
+                <div class="w-full flex justify-center mt-4">
+                    <button id="start-btn"
+                        class="w-full md:w-3/4 bg-gradient-to-r from-emerald-500/30 to-teal-500/30 hover:from-emerald-400/40 hover:to-teal-400/40 text-white font-light tracking-[0.4em] rounded-xl py-4 border border-white/20 transition-all shadow-[0_0_15px_rgba(20,180,120,0.2)] hover:shadow-[0_0_25px_rgba(20,180,120,0.4)] active:scale-95 group focus:outline-none">
+                        <span class="group-hover:opacity-100 opacity-90 transition-opacity">开 始 冥 想</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心圆圈区 -->
+    <div class="flex-1 flex flex-col items-center justify-center relative w-full translate-y-[-20px]">
+        <div class="breath-container animate-float">
+            <!-- 外围光圈 -->
+            <div id="aura-1" class="aura-ring"></div>
+            <div id="aura-2" class="aura-ring"></div>
+
+            <!-- 核心交互：光点打坐人形 -->
+            <div id="breath-circle">
+                <!-- SVG 光点人形 -->
+                <svg id="meditation-figure" viewBox="0 0 100 100"
+                    class="absolute w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] z-0 transition-opacity"
+                    style="pointer-events: none; transition-duration: 1.5s;">
+                    <g fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="2.2" stroke-linecap="round"
+                        stroke-linejoin="round" stroke-dasharray="0.1 6">
+                        <!-- 头部 -->
+                        <circle cx="50" cy="22" r="8" />
+                        <!-- 躯干 -->
+                        <path d="M 50 30 L 50 60" />
+                        <!-- 手臂搭膝盖 -->
+                        <path d="M 50 35 C 30 35, 20 50, 25 72" />
+                        <path d="M 50 35 C 70 35, 80 50, 75 72" />
+                        <circle cx="25" cy="72" r="2" />
+                        <circle cx="75" cy="72" r="2" />
+                        <!-- 盘腿 -->
+                        <path d="M 25 72 C 35 88, 65 88, 75 72" />
+                        <path d="M 25 72 C 40 78, 60 78, 75 72" />
+                    </g>
+                </svg>
+
+                <div class="flex flex-col items-center justify-center z-20">
+                    <div id="status-text"
+                        class="text-2xl font-extralight tracking-[0.4em] text-white/50 text-center select-none ml-2 transition-all duration-700">
+                        起息
+                    </div>
+                    <!-- 倒数大数字 -->
+                    <div id="timer-text"
+                        class="text-4xl font-extralight text-white/40 mt-1 tracking-widest text-center select-none tabular-nums opacity-0 transition-all duration-500 transform translate-y-2">
+                        0
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="start-hint"
+            class="absolute bottom-[-70px] text-sm text-white/50 tracking-[0.3em] font-light transition-opacity duration-1000">
+        </div>
+    </div>
+
+    <!-- 语录展示区 -->
+    <div
+        class="absolute bottom-6 w-full px-12 text-center flex flex-col items-center justify-center pointer-events-none">
+        <div class="max-w-4xl mx-auto">
+            <p id="quote-text"
+                class="text-white/90 font-light text-[22px] leading-relaxed tracking-wide quote-transition opacity-0 italic drop-shadow-xl transform translate-y-4 shadow-black/50">
+            </p>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 1. 高品质语录库与背景库
+         */
+        const QUOTES = [
+            "吸气，我平静身心；呼气，我微笑。 —— 一行禅师",
+            "你不是你的想法，你是观察想法的那份觉知。 —— 迈克·辛格",
+            "放松，释放，让生命自由流淌。 —— 迈克·辛格",
+            "呼吸是连接生命与意识的桥梁。 —— 一行禅师",
+            "真正的自由，是内心的宁静与辽阔。 —— 迈克·辛格",
+            "每一次呼吸，都是重生的奇迹。 —— 一行禅师",
+            "让一切如其所是，你就自由了。 —— 迈克·辛格",
+            "安住当下，便可接触到生命的广阔。 —— 一行禅师",
+            "如果你想获得平静，就必须停止在头脑中挣扎。 —— 迈克·辛格",
+            "专注这一刻，因为只有这一刻是真实的。 —— 一行禅师"
+        ];
+
+        // 高质量稳定 CDN 森林/自然图库
+        const BACKGROUNDS = [
+            "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1920&auto=format&fit=crop", // 深林
+            "https://images.unsplash.com/photo-1470071131384-001b85755b36?q=80&w=1920&auto=format&fit=crop", // 青绿山河
+            "https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=1920&auto=format&fit=crop", // 森林树冠仰望
+            "https://images.unsplash.com/photo-1426604966848-d7adac402bff?q=80&w=1920&auto=format&fit=crop", // 湖泊山川
+            "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=1920&auto=format&fit=crop", // 迷雾森林
+            "https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?q=80&w=1920&auto=format&fit=crop"  // 雪山树林
+        ];
+
+        let currentBgIdx = 0;
+        let activeBgLayer = 1;
+        let lastQuoteIdx = -1;
+
+        // 初始化背景
+        function initBackground() {
+            // 打乱背景图顺序带来新鲜感
+            BACKGROUNDS.sort(() => Math.random() - 0.5);
+            const layer1 = document.getElementById('bg-layer-1');
+            const img = new Image();
+            img.onload = () => { layer1.style.backgroundImage = `url('${BACKGROUNDS[0]}')`; };
+            img.onerror = () => { layer1.style.backgroundImage = 'radial-gradient(circle at 50% 100%, #2b4131 0%, #050f09 100%)'; };
+            img.src = BACKGROUNDS[0];
+        }
+        initBackground();
+
+        // 每次吸气循环触发一次背景切换与语录更新
+        function cycleBackgroundAndQuote() {
+            // 切换背景
+            currentBgIdx = (currentBgIdx + 1) % BACKGROUNDS.length;
+            const nextLayerNum = activeBgLayer === 1 ? 2 : 1;
+            const currentLayerEl = document.getElementById(`bg-layer-${activeBgLayer}`);
+            const nextLayerEl = document.getElementById(`bg-layer-${nextLayerNum}`);
+
+            // 预加载新图，平滑过渡并提供优雅降级方案
+            const img = new Image();
+            const fallbackColors = [
+                'radial-gradient(circle at 10% 20%, #2f453a 0%, #08110c 100%)',
+                'radial-gradient(circle at 80% 80%, #1e3a47 0%, #050d12 100%)',
+                'radial-gradient(circle at 50% -20%, #303728 0%, #0a0b08 100%)'
+            ];
+            const fallbackBg = fallbackColors[currentBgIdx % fallbackColors.length];
+
+            img.onload = () => {
+                nextLayerEl.style.backgroundImage = `url('${BACKGROUNDS[currentBgIdx]}')`;
+                nextLayerEl.classList.add('active');
+                currentLayerEl.classList.remove('active');
+                activeBgLayer = nextLayerNum;
+            };
+            img.onerror = () => {
+                nextLayerEl.style.backgroundImage = fallbackBg;
+                nextLayerEl.classList.add('active');
+                currentLayerEl.classList.remove('active');
+                activeBgLayer = nextLayerNum;
+            };
+            img.src = BACKGROUNDS[currentBgIdx];
+
+            // 提取新语录，确保不与上次重复
+            let quoteIdx;
+            do { quoteIdx = Math.floor(Math.random() * QUOTES.length); } while (quoteIdx === lastQuoteIdx);
+            lastQuoteIdx = quoteIdx;
+
+            const quoteEl = document.getElementById('quote-text');
+            // 淡出旧语录
+            quoteEl.style.opacity = 0;
+            quoteEl.style.transform = 'translateY(8px)';
+
+            // 延时淡入新语录，使其持续整个循环
+            setTimeout(() => {
+                quoteEl.innerText = QUOTES[quoteIdx];
+                quoteEl.style.opacity = 0.95;
+                quoteEl.style.transform = 'translateY(0)';
+            }, 1000);
+        }
+
+        /**
+         * 2. 光尘粒子系统 流体力学
+         */
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particlesArray = [];
+        let particleMode = 'idle'; // idle, attract, repel
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 0.4 - 0.2;
+                this.speedY = Math.random() * -0.6 - 0.1;
+                this.opacity = Math.random() * 0.6;
+            }
+            update() {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+
+                if (particleMode === 'attract') {
+                    // 吸气：粒子向全屏中心汇聚汲取 (力度加大)
+                    const dx = centerX - this.x;
+                    const dy = centerY - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 20) {
+                        this.x += (dx / dist) * 2.8; // 更明显聚合
+                        this.y += (dy / dist) * 2.8;
+                    } else {
+                        // 被中心吸收后从随机边缘重生继续汲取
+                        this.x = Math.random() > 0.5 ? Math.random() * canvas.width : (Math.random() > 0.5 ? 0 : canvas.width);
+                        this.y = Math.random() > 0.5 ? Math.random() * canvas.height : (Math.random() > 0.5 ? 0 : canvas.height);
+                    }
+                } else if (particleMode === 'repel') {
+                    // 吐气：由于反哺释放，粒子产生爆炸性外扩涟漪 (力度加大)
+                    const dx = this.x - centerX;
+                    const dy = this.y - centerY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < canvas.height * 1.5) {
+                        this.x += (dx / Math.max(dist, 1)) * 4.5; // 更明显分散
+                        this.y += (dy / Math.max(dist, 1)) * 4.5;
+                    } else {
+                        // 飞出太远则在中心附近重生，准备下一次爆炸
+                        this.x = centerX + (Math.random() - 0.5) * 150;
+                        this.y = centerY + (Math.random() - 0.5) * 150;
+                    }
+                } else if (particleMode === 'scatterWait') {
+                    // 放空散射：带着重力或残余速度平滑向外散开，直到静止
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+                    this.speedX *= 0.98; // 摩擦力减速
+                    this.speedY *= 0.98;
+                    // 飞出边界后重生在边缘
+                    if (this.y < 0) { this.y = canvas.height; this.x = Math.random() * canvas.width; }
+                    if (this.y > canvas.height) { this.y = 0; this.x = Math.random() * canvas.width; }
+                    if (this.x < 0) { this.x = canvas.width; this.y = Math.random() * canvas.height; }
+                    if (this.x > canvas.width) { this.x = 0; this.y = Math.random() * canvas.height; }
+                } else {
+                    // idle 模式（屏息）：宇宙静止与缓慢漂移
+                    this.x += this.speedX * 0.3; // 降速以显静谧
+                    this.y += this.speedY * 0.3;
+                    if (this.y < 0) {
+                        this.y = canvas.height;
+                        this.x = Math.random() * canvas.width;
+                    }
+                    if (this.y > canvas.height) { this.y = 0; this.x = Math.random() * canvas.width; }
+                    if (this.x < 0) { this.x = canvas.width; this.y = Math.random() * canvas.height; }
+                    if (this.x > canvas.width) { this.x = 0; this.y = Math.random() * canvas.height; }
+                }
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particlesArray = [];
+            // 显著增加粒子数量
+            for (let i = 0; i < 200; i++) particlesArray.push(new Particle());
+        }
+
+        // 定向发射器，在两个屏息期爆发出惊艳繁星
+        function triggerParticlesScatter(type) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            particlesArray.forEach(p => {
+                const angle = Math.random() * Math.PI * 2;
+                if (type === 'hold1') {
+                    // 吸气结束时光环扩大，在此时爆散成漫天光雨
+                    const radius = 110 * 2.4 + (Math.random() * 40 - 20);
+                    p.x = centerX + Math.cos(angle) * radius;
+                    p.y = centerY + Math.sin(angle) * radius;
+                    // 以强力速度爆散入深空
+                    p.speedX = Math.cos(angle) * (Math.random() * 8 + 3);
+                    p.speedY = Math.sin(angle) * (Math.random() * 8 + 3);
+                } else if (type === 'hold2') {
+                    // 极度坍缩的光点剧烈放射状爆发
+                    const radius = Math.random() * 20;
+                    p.x = centerX + Math.cos(angle) * radius;
+                    p.y = centerY + Math.sin(angle) * radius;
+                    // 爆发速度极大
+                    p.speedX = Math.cos(angle) * (Math.random() * 8 + 3);
+                    p.speedY = Math.sin(angle) * (Math.random() * 8 + 3);
+                }
+            });
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        initParticles();
+        animateParticles();
+
+        /**
+         * 3. 沉浸 Web Audio API 音响引擎
+         */
+        let audioCtx;
+        let ambientNode = null;
+        let ambientGainNode = null;
+        let windModTimer = null;
+        let isAudioInitialized = false;
+        const ambientTypes = ['earth', 'water', 'fire', 'wind', 'void'];
+        // 在页面刚加载时就由系统内定随机分配一个
+        let currentAmbientType = ambientTypes[Math.floor(Math.random() * ambientTypes.length)];
+
+        // 立即在 UI 回显
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.ambient-btn').forEach(btn => {
+                if (btn.dataset.ambient === currentAmbientType) {
+                    btn.classList.add('bg-white/20', 'text-white', 'shadow-sm');
+                    btn.classList.remove('text-white/60');
+                } else {
+                    btn.classList.remove('bg-white/20', 'text-white', 'shadow-sm');
+                    btn.classList.add('text-white/60');
+                }
+            });
+        });
+
+        function initAudio() {
+            if (isAudioInitialized) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                isAudioInitialized = true;
+
+                switchAmbientNoise(currentAmbientType);
+            } catch (e) { console.warn('Web Audio API not supported', e); }
+        }
+
+        // 神奇的多元生成器（地、水、火、风、空）
+        function switchAmbientNoise(type) {
+            if (!audioCtx) return;
+            currentAmbientType = type;
+
+            if (ambientNode) {
+                try { ambientNode.stop(); } catch (_) { }
+                ambientNode.disconnect();
+                ambientNode = null;
+            }
+            if (windModTimer) {
+                clearInterval(windModTimer);
+                windModTimer = null;
+            }
+            if (ambientGainNode) {
+                ambientGainNode.disconnect();
+                ambientGainNode = null;
+            }
+
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+
+            let lastOut = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                let sample = 0;
+
+                if (type === 'fire') {
+                    // 火焰噼啪声：带阻尼底噪 + 稀疏脉冲，避免数值发散
+                    let crackle = 0;
+                    if (Math.random() > 0.9992) crackle = (Math.random() * 2 - 1) * 0.9;
+                    else if (Math.random() > 0.99) crackle = (Math.random() * 2 - 1) * 0.25;
+
+                    sample = ((lastOut + (0.045 * white)) / 1.045) + crackle;
+                    lastOut = sample * 0.82;
+                    sample *= 0.95;
+                } else if (type === 'void') {
+                    // 空：高频细白噪，独立于历史状态
+                    sample = white * 0.15;
+                    lastOut = 0;
+                } else {
+                    // 地/水/风：稳定布朗噪底。注意 lastOut 必须使用未增益前数值。
+                    sample = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = sample;
+                    sample *= 3.2;
+                }
+
+                if (!Number.isFinite(sample)) sample = 0;
+                // 对输入做硬限幅，防止极端值污染滤波器内部状态。
+                output[i] = Math.max(-1, Math.min(1, sample));
+            }
+
+            ambientNode = audioCtx.createBufferSource();
+            ambientNode.buffer = buffer;
+            ambientNode.loop = true;
+
+            const filter = audioCtx.createBiquadFilter();
+
+            if (type === 'earth') {
+                filter.type = 'lowpass'; filter.frequency.value = 140; // 地：极深的浑厚地震动
+            } else if (type === 'water') {
+                filter.type = 'lowpass'; filter.frequency.value = 550; // 水：原厂细密雨声
+            } else if (type === 'fire') {
+                filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.6; // 火：嘶嘶带燃烧噼啪
+            } else if (type === 'wind') {
+                filter.type = 'lowpass'; filter.frequency.value = 600;
+                // 风：改用控制速率调制，避免 audio-rate automation 导致的 Biquad bad state
+                const baseFreq = 600;
+                const sweep = 120;
+                let phase = 0;
+                windModTimer = setInterval(() => {
+                    if (!audioCtx) return;
+                    phase += 0.08;
+                    const nextFreq = Math.max(120, baseFreq + Math.sin(phase) * sweep);
+                    filter.frequency.setTargetAtTime(nextFreq, audioCtx.currentTime, 0.12);
+                }, 80);
+            } else if (type === 'void') {
+                filter.type = 'highpass'; filter.frequency.value = 3500; // 空：剔除一切杂质，只留冰冷清透的高频游丝
+            }
+
+            ambientGainNode = audioCtx.createGain();
+            ambientGainNode.gain.value = 0;
+
+            ambientNode.connect(filter);
+            filter.connect(ambientGainNode);
+            ambientGainNode.connect(audioCtx.destination);
+            ambientNode.start();
+
+            updateAudioVolume();
+        }
+
+        function updateAudioVolume() {
+            if (!ambientGainNode) return;
+            const isEnabled = document.getElementById('audio-toggle').checked;
+            const volume = parseInt(document.getElementById('volume-slider').value) / 100;
+
+            const now = audioCtx.currentTime;
+            ambientGainNode.gain.cancelScheduledValues(now);
+
+            // 为不同的音效分配不同的默认响度权重，使其听感统一
+            let vMult = 0.6;
+            if (currentAmbientType === 'earth') vMult = 1.4;
+            if (currentAmbientType === 'fire') vMult = 0.8;
+            if (currentAmbientType === 'wind') vMult = 1.0;
+            if (currentAmbientType === 'void') vMult = 0.4;
+
+            // 彻底杜绝使用 linearRampToValueAtTime，转而使用更加底层、无限逼近且绝对安全的 setTargetAtTime
+            // 这避免了 Chrome 引擎在缺失上一状态显式取值时导致的挂载失败（哑音现象）。
+            if (isEnabled && isSessionActive) {
+                ambientGainNode.gain.setTargetAtTime(volume * vMult, now, 0.4);
+            } else {
+                ambientGainNode.gain.setTargetAtTime(0, now, 0.2);
+            }
+        }
+
+        function playChime(phase) {
+            if (!audioCtx || !document.getElementById('audio-toggle').checked) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const now = audioCtx.currentTime;
+            const volumeSlider = parseInt(document.getElementById('volume-slider').value) / 100;
+
+            if (phase === 'inhale') {
+                // 水滴 (Water Drop)：吸收生命源泉
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+
+                // 水滴的轻灵变频
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.02);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+
+                // 水滴短促的包络伴随悠长余音
+                const maxVol = volumeSlider * 0.8;
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(maxVol, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 4);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 4);
+
+            } else if (phase === 'exhale') {
+                // 皮鼓 (Drum)：大地的心跳，深沉反哺
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+
+                // 鼓面低频下潜
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+
+                // 鼓声明亮的锤击感包络伴随悠长余音
+                const maxVol = volumeSlider * 1.5; // 低频需要更多响度
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(maxVol, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 4);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 4);
+
+            } else {
+                // 屏息 (Hold1 / Hold2) - 磬 (Qing / Singing Bowl)：空灵悠远
+                const f = phase === 'hold1' ? 432 : 396;
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+                osc1.frequency.value = f;
+                osc2.frequency.value = f * 1.006; // 制造嗡鸣拍频效应
+
+                let maxVol = volumeSlider * 0.45;
+                if (phase === 'hold2') maxVol *= 0.6; // 第二次留白更轻柔
+
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(maxVol, now + 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + (phase === 'hold2' ? 2.5 : 4.5));
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 5);
+                osc2.stop(now + 5);
+            }
+        }
+
+        /**
+         * 4. 极致四段呼吸核心逻辑系统
+         */
+        let isSessionActive = false;
+        let phaseTimer = null;
+        let countdownTimer = null;
+        let remainingSessionTime = 5 * 60;
+        let endlessMode = false;
+
+        let durations = { inhale: 4, hold1: 4, exhale: 4, hold2: 4 };
+
+        const circle = document.getElementById('breath-circle');
+        const aura1 = document.getElementById('aura-1');
+        const aura2 = document.getElementById('aura-2');
+        const statusText = document.getElementById('status-text');
+        const timerText = document.getElementById('timer-text');
+        const quoteText = document.getElementById('quote-text');
+        const startHint = document.getElementById('start-hint');
+
+        // UI 交互
+        document.getElementById('settings-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (isSessionActive) {
+                toggleSession();
+            }
+
+            const overlay = document.getElementById('settings-overlay');
+            if (overlay.classList.contains('hidden') || overlay.classList.contains('opacity-0')) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    overlay.classList.remove('opacity-0', 'pointer-events-none');
+                    overlay.classList.add('opacity-100', 'pointer-events-auto');
+
+                    const panel = document.getElementById('settings-panel');
+                    panel.classList.remove('scale-95');
+                    panel.classList.add('scale-100');
+                }, 10);
+            } else {
+                overlay.classList.remove('opacity-100', 'pointer-events-auto');
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+
+                const panel = document.getElementById('settings-panel');
+                panel.classList.remove('scale-100');
+                panel.classList.add('scale-95');
+                setTimeout(() => { overlay.classList.add('hidden'); }, 400);
+            }
+        });
+
+        // 绑定底部“开始冥想”专属按钮
+        document.getElementById('start-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const overlay = document.getElementById('settings-overlay');
+            overlay.classList.remove('opacity-100', 'pointer-events-auto');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+
+            const panel = document.getElementById('settings-panel');
+            panel.classList.remove('scale-100');
+            panel.classList.add('scale-95');
+            setTimeout(() => { overlay.classList.add('hidden'); }, 400);
+
+            if (!isSessionActive) {
+                toggleSession();
+            }
+        });
+
+        document.getElementById('audio-toggle').addEventListener('change', updateAudioVolume);
+        document.getElementById('volume-slider').addEventListener('input', updateAudioVolume);
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.mode-btn').forEach(b => {
+                    b.classList.remove('bg-white/20', 'border-white/10');
+                    b.classList.add('bg-white/5', 'border-transparent');
+                });
+                e.target.classList.remove('bg-white/5', 'border-transparent');
+                e.target.classList.add('bg-white/20', 'border-white/10');
+
+                const mode = e.target.dataset.mode;
+                const customInputs = document.getElementById('custom-inputs');
+
+                if (mode === 'custom') {
+                    customInputs.classList.remove('hidden');
+                    customInputs.classList.add('grid');
+                    updateCustomDurations();
+                } else {
+                    customInputs.classList.add('hidden');
+                    customInputs.classList.remove('grid');
+                    const parts = mode.split('-');
+                    durations = {
+                        inhale: Math.max(0, parseInt(parts[0])),
+                        hold1: Math.max(0, parseInt(parts[1])),
+                        exhale: Math.max(0, parseInt(parts[2])),
+                        hold2: Math.max(0, parseInt(parts[3]))
+                    };
+                }
+            });
+        });
+
+        ['in', 'hold1', 'out', 'hold2'].forEach(type => {
+            document.getElementById(`${type}-time`).addEventListener('change', updateCustomDurations);
+        });
+
+        function updateCustomDurations() {
+            if (document.querySelector('.mode-btn[data-mode="custom"]').classList.contains('bg-white/20')) {
+                durations = {
+                    inhale: Math.max(0, parseInt(document.getElementById('in-time').value) || 0),
+                    hold1: Math.max(0, parseInt(document.getElementById('hold1-time').value) || 0),
+                    exhale: Math.max(0, parseInt(document.getElementById('out-time').value) || 0),
+                    hold2: Math.max(0, parseInt(document.getElementById('hold2-time').value) || 0)
+                };
+                // 防御 4 个全是 0 引发的死循环
+                if (durations.inhale === 0 && durations.hold1 === 0 && durations.exhale === 0 && durations.hold2 === 0) {
+                    durations.inhale = 4;
+                    document.getElementById('in-time').value = 4;
+                }
+            }
+        }
+
+        const timerBtns = document.querySelectorAll('.timer-btn');
+        timerBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                timerBtns.forEach(b => {
+                    b.classList.remove('bg-white/20', 'text-white', 'shadow-sm');
+                    b.classList.add('text-white/60');
+                });
+                e.target.classList.add('bg-white/20', 'text-white', 'shadow-sm');
+                e.target.classList.remove('text-white/60');
+
+                const tValue = e.target.dataset.time;
+                const cti = document.getElementById('custom-timer-input');
+
+                if (tValue === 'custom') {
+                    cti.classList.remove('hidden');
+                    cti.classList.add('flex');
+                    const mins = parseInt(document.getElementById('custom-minutes').value) || 15;
+                    endlessMode = false;
+                    remainingSessionTime = mins * 60;
+                } else {
+                    cti.classList.add('hidden');
+                    cti.classList.remove('flex');
+                    const mins = parseInt(tValue);
+                    endlessMode = (mins === 0);
+                    if (!endlessMode) remainingSessionTime = mins * 60;
+                }
+
+                if (isSessionActive) {
+                    toggleSession();
+                }
+            });
+        });
+
+        document.getElementById('custom-minutes').addEventListener('change', (e) => {
+            const mins = parseInt(e.target.value) || 15;
+            endlessMode = false;
+            remainingSessionTime = mins * 60;
+            if (isSessionActive) toggleSession();
+        });
+
+        const ambientBtns = document.querySelectorAll('.ambient-btn');
+        ambientBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                ambientBtns.forEach(b => {
+                    b.classList.remove('bg-white/20', 'text-white', 'shadow-sm');
+                    b.classList.add('text-white/60');
+                });
+                e.target.classList.add('bg-white/20', 'text-white', 'shadow-sm');
+                e.target.classList.remove('text-white/60');
+
+                currentAmbientType = e.target.dataset.ambient;
+                if (isAudioInitialized) {
+                    switchAmbientNoise(currentAmbientType);
+                }
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            const overlay = document.getElementById('settings-overlay');
+            const panel = document.getElementById('settings-panel');
+            const btn = document.getElementById('settings-btn');
+            // 如果点击了蒙层外部（不包含 panel 和 btn自身），就关闭它
+            if (!panel.contains(e.target) && !btn.contains(e.target) && !overlay.classList.contains('opacity-0')) {
+                btn.click();
+            }
+        });
+
+        function updateStatusText(text, hide = false) {
+            statusText.style.opacity = 0;
+            statusText.style.transform = 'translateY(-2px)';
+            setTimeout(() => {
+                if (!hide) {
+                    statusText.innerText = text;
+                    statusText.style.opacity = 0.5; // 非常轻柔的透明度上限
+                    statusText.style.transform = 'translateY(0)';
+                }
+            }, 300);
+        }
+
+        function preciseCountdownLogic(totalSeconds, hide = false) {
+            clearInterval(countdownTimer);
+            if (totalSeconds <= 0) {
+                timerText.style.opacity = 0;
+                return;
+            }
+
+            timerText.style.opacity = hide ? 0 : 0.4; // 较弱的视觉干扰
+            timerText.style.transform = 'translateY(0) scale(1.05)';
+            if (!hide) timerText.innerText = totalSeconds;
+
+            setTimeout(() => {
+                if (!hide) timerText.style.transform = 'translateY(0) scale(1)';
+            }, 150);
+
+            let tick = totalSeconds;
+            countdownTimer = setInterval(() => {
+                tick--;
+                if (tick > 0) {
+                    if (!hide) {
+                        timerText.innerText = tick;
+                        // 微跳动效果
+                        timerText.style.transform = 'translateY(0) scale(1.08)';
+                        setTimeout(() => timerText.style.transform = 'translateY(0) scale(1)', 150);
+                    }
+                } else {
+                    clearInterval(countdownTimer);
+                }
+            }, 1000);
+        }
+
+        let currentPhaseId = 0;
+
+        function playPhase(phase) {
+            if (!isSessionActive) return;
+
+            if (!endlessMode && remainingSessionTime <= 0) {
+                endSession();
+                return;
+            }
+
+            currentPhaseId++;
+            const myPhaseId = currentPhaseId;
+
+            let time = 0;
+            let nextPhase = '';
+            let text = '';
+            let hideUI = false;
+
+            const overlayLayer = document.querySelector('.overlay');
+
+            const baseScale = 1;
+            const expandedScale = 2.4;
+            const expandedAura = 1.6;
+
+            // 天人合一极值
+            const hold1Scale = 4.0; // 吸气后继续膨胀融为一体
+            const hold2Scale = 0.2; // 吐气后缩为一个极小的光点相融
+
+            if (phase === 'inhale') {
+                time = durations.inhale;
+                nextPhase = durations.hold1 > 0 ? 'hold1' : (durations.exhale > 0 ? 'exhale' : (durations.hold2 > 0 ? 'hold2' : 'inhale'));
+                text = '吸气';
+                particleMode = 'attract'; // 汲取粒子
+
+                cycleBackgroundAndQuote();
+
+                if (time > 0) {
+                    playChime('inhale');
+
+                    const tStr = `${time}s`;
+                    circle.style.transitionDuration = tStr; aura1.style.transitionDuration = tStr; aura2.style.transitionDuration = tStr;
+                    overlayLayer.style.transitionDuration = tStr;
+
+                    circle.style.transform = `scale(${expandedScale})`;
+                    aura1.style.transform = `scale(${expandedAura})`;
+                    aura2.style.transform = `scale(${expandedAura * 1.1})`;
+
+                    document.getElementById('meditation-figure').style.opacity = 1;
+                    aura1.style.opacity = 0.8;
+                    aura2.style.opacity = 0.8;
+                    overlayLayer.style.opacity = 1;
+
+                    // == 0秒屏息的高潮化境接管 ==
+                    if (durations.hold1 === 0) {
+                        const climaxTime = Math.min(1.5, Math.max(0.5, time * 0.3));
+                        setTimeout(() => {
+                            if (myPhaseId !== currentPhaseId || !isSessionActive) return;
+                            const leadStr = `${climaxTime}s`;
+                            circle.style.transitionDuration = leadStr; aura1.style.transitionDuration = leadStr; aura2.style.transitionDuration = leadStr;
+                            overlayLayer.style.transitionDuration = leadStr;
+
+                            circle.style.transform = `scale(${hold1Scale})`;
+                            aura1.style.transform = `scale(${hold1Scale * 1.2})`;
+                            aura2.style.transform = `scale(${hold1Scale * 1.3})`;
+
+                            document.getElementById('meditation-figure').style.opacity = 0;
+                            aura1.style.opacity = 0;
+                            aura2.style.opacity = 0;
+                            overlayLayer.style.opacity = 0.2;
+
+                            triggerParticlesScatter('hold1');
+                            timerText.style.opacity = 0;
+                            statusText.style.opacity = 0;
+                        }, (time - climaxTime) * 1000);
+                    }
+                }
+
+            } else if (phase === 'hold1') {
+                time = durations.hold1;
+                nextPhase = durations.exhale > 0 ? 'exhale' : (durations.hold2 > 0 ? 'hold2' : 'inhale');
+                text = '屏息';
+                particleMode = 'idle'; // 天人合一，静谧
+
+                if (time > 0) {
+                    playChime('hold1');
+                    const tStr = `${time}s`;
+                    circle.style.transitionDuration = tStr; aura1.style.transitionDuration = tStr; aura2.style.transitionDuration = tStr;
+                    overlayLayer.style.transitionDuration = tStr;
+
+                    // 吸气后屏息：持续扩大至巨大，光环消融，与背景完全相连
+                    circle.style.transform = `scale(${hold1Scale})`;
+                    aura1.style.transform = `scale(${hold1Scale * 1.2})`;
+                    aura2.style.transform = `scale(${hold1Scale * 1.3})`;
+
+                    // 完全消融人形，与大自然天人合一
+                    document.getElementById('meditation-figure').style.opacity = 0;
+                    aura1.style.opacity = 0; // 光圈隐去融入天地
+                    aura2.style.opacity = 0;
+
+                    // 让遮罩变薄，透出后方自然风景
+                    overlayLayer.style.opacity = 0.2;
+                }
+
+            } else if (phase === 'exhale') {
+                time = durations.exhale;
+                nextPhase = durations.hold2 > 0 ? 'hold2' : 'inhale';
+                text = '吐气';
+                particleMode = 'repel'; // 反哺释放粒子涟漪
+
+                if (time > 0) {
+                    playChime('exhale');
+
+                    const tStr = `${time}s`;
+                    circle.style.transitionDuration = tStr; aura1.style.transitionDuration = tStr; aura2.style.transitionDuration = tStr;
+                    overlayLayer.style.transitionDuration = tStr;
+
+                    circle.style.transform = `scale(${baseScale})`;
+                    aura1.style.transform = `scale(${baseScale})`;
+                    aura2.style.transform = `scale(${baseScale})`;
+
+                    document.getElementById('meditation-figure').style.opacity = 0.6;
+                    aura1.style.opacity = 0.15;
+                    aura2.style.opacity = 0.05;
+                    overlayLayer.style.opacity = 1;
+
+                    // == 0秒屏息的高潮化境接管 ==
+                    if (durations.hold2 === 0) {
+                        const climaxTime = Math.min(1.5, Math.max(0.5, time * 0.3));
+                        setTimeout(() => {
+                            if (myPhaseId !== currentPhaseId || !isSessionActive) return;
+                            const leadStr = `${climaxTime}s`;
+                            circle.style.transitionDuration = leadStr; aura1.style.transitionDuration = leadStr; aura2.style.transitionDuration = leadStr;
+                            overlayLayer.style.transitionDuration = leadStr;
+
+                            circle.style.transform = `scale(${hold2Scale})`;
+                            aura1.style.transform = `scale(${hold2Scale})`;
+                            aura2.style.transform = `scale(${hold2Scale})`;
+
+                            document.getElementById('meditation-figure').style.opacity = 0;
+                            aura1.style.opacity = 0;
+                            aura2.style.opacity = 0;
+                            overlayLayer.style.opacity = 0.2;
+
+                            triggerParticlesScatter('hold2');
+                            timerText.style.opacity = 0;
+                            statusText.style.opacity = 0;
+                        }, (time - climaxTime) * 1000);
+                    }
+                }
+
+            } else if (phase === 'hold2') {
+                time = durations.hold2;
+                nextPhase = 'inhale';
+                text = '屏息';
+                particleMode = 'scatterWait'; // 奇点爆发散落繁星
+                hideUI = true;
+
+                if (time > 0) {
+                    playChime('hold2');
+                    triggerParticlesScatter('hold2');
+                    const tStr = `${time}s`;
+                    circle.style.transitionDuration = tStr; aura1.style.transitionDuration = tStr; aura2.style.transitionDuration = tStr;
+                    overlayLayer.style.transitionDuration = tStr;
+
+                    // 吐气后屏息：回归奇点，缩成极微小的光点
+                    circle.style.transform = `scale(${hold2Scale})`;
+                    aura1.style.transform = `scale(${hold2Scale})`;
+                    aura2.style.transform = `scale(${hold2Scale})`;
+
+                    // 消融人形
+                    document.getElementById('meditation-figure').style.opacity = 0;
+                    aura1.style.opacity = 0;
+                    aura2.style.opacity = 0;
+
+                    overlayLayer.style.opacity = 0.2;
+                }
+            }
+
+            // 对于配置为 0 秒的阶段，光速跳跃以保证连续不卡顿，且防死循环
+            if (time === 0) {
+                // 如果是 inhale 为 0 但是仍然启动下一阶段，就延迟一点避免堆栈溢出
+                setTimeout(() => playPhase(nextPhase), 10);
+                return;
+            }
+
+            updateStatusText(text, hideUI);
+            preciseCountdownLogic(time, hideUI);
+
+            phaseTimer = setTimeout(() => {
+                playPhase(nextPhase);
+            }, time * 1000);
+        }
+
+        // 独立于相位的全局倒数时钟，每秒平滑推进
+        setInterval(() => {
+            if (isSessionActive) {
+                const gt = document.getElementById('global-timer');
+                if (endlessMode) {
+                    gt.innerText = "深 空 无 尽";
+                } else if (remainingSessionTime > 0) {
+                    remainingSessionTime--;
+                    const m = Math.floor(remainingSessionTime / 60);
+                    const s = remainingSessionTime % 60;
+                    gt.innerText = `剩 余 ${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                }
+            }
+        }, 1000);
+
+        function toggleSession() {
+            if (!isAudioInitialized) {
+                initAudio();
+            }
+            // 无论如何，检查并唤醒音频上下文，以防在初始加载时没有触发响应
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (isSessionActive) {
+                isSessionActive = false;
+                clearTimeout(phaseTimer);
+                clearInterval(countdownTimer);
+                particleMode = 'idle';
+
+                circle.style.transitionDuration = '1.5s'; aura1.style.transitionDuration = '1.5s'; aura2.style.transitionDuration = '1.5s';
+                circle.style.transform = 'scale(1)'; aura1.style.transform = 'scale(1)'; aura2.style.transform = 'scale(1)';
+                document.getElementById('meditation-figure').style.opacity = 0.6;
+                aura1.style.opacity = 0; aura2.style.opacity = 0;
+
+                updateStatusText('起息');
+                timerText.style.opacity = 0;
+                timerText.style.transform = 'translateY(8px)';
+                startHint.style.opacity = 1;
+                document.getElementById('global-timer').style.opacity = 0;
+
+                quoteText.style.opacity = 0;
+                updateAudioVolume(); // stop sound
+            } else {
+                isSessionActive = true;
+                startHint.style.opacity = 0;
+                document.getElementById('global-timer').style.opacity = 1;
+
+                // 强制将底层的 gainNode 时序推到现位，然后再挂载斜坡才能起效
+                if (ambientGainNode && audioCtx) {
+                    ambientGainNode.gain.setValueAtTime(ambientGainNode.gain.value, audioCtx.currentTime);
+                }
+                updateAudioVolume(); // start sound
+
+                if (!endlessMode) {
+                    const activeBtn = document.querySelector('.timer-btn.bg-white\\/20');
+                    if (activeBtn) {
+                        if (activeBtn.dataset.time === 'custom') {
+                            remainingSessionTime = parseInt(document.getElementById('custom-minutes').value) * 60;
+                        } else {
+                            remainingSessionTime = parseInt(activeBtn.dataset.time) * 60;
+                        }
+                    }
+                }
+                playPhase('inhale');
+            }
+        }
+
+        function endSession() {
+            isSessionActive = false;
+            clearTimeout(phaseTimer);
+            clearInterval(countdownTimer);
+
+            updateStatusText('愿你安住');
+            timerText.style.opacity = 0;
+
+            circle.style.transitionDuration = '3s'; aura1.style.transitionDuration = '3s'; aura2.style.transitionDuration = '3s';
+            circle.style.transform = 'scale(1)'; aura1.style.transform = 'scale(1)'; aura2.style.transform = 'scale(1)';
+            aura1.style.opacity = 0; aura2.style.opacity = 0;
+
+            updateAudioVolume();
+
+            setTimeout(() => {
+                quoteText.innerText = "身心合一，寂静欢喜。";
+                quoteText.style.opacity = 1;
+                quoteText.style.transform = 'translateY(0)';
+            }, 1500);
+
+            setTimeout(() => {
+                updateStatusText('起息');
+                startHint.style.opacity = 1;
+                quoteText.style.opacity = 0;
+            }, 9000);
+        }
+    </script>
+</body>
+
+</html>
