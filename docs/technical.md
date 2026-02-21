@@ -38,6 +38,8 @@
 - `remainingSessionTime`：剩余秒数。
 - `endlessMode`：是否无尽模式。
 - `currentAmbientType`：当前环境音类型。
+- `currentAmbientEngine`：当前环境音引擎（`sample/synth`）。
+- `cueMode`：提示音模式（`sample/synth`）。
 - `ambientFilterNode`：当前环境音滤波节点引用。
 - `particleMode`：粒子行为模式（`idle/attract/repel/scatterWait`）。
 - `currentPhase`：当前呼吸相位。
@@ -73,24 +75,30 @@
 
 ## 5. 音频架构与实现
 ### 5.1 环境音
-- 使用 `AudioBufferSourceNode` 循环噪声缓冲区。
-- 使用 `BiquadFilterNode` 区分五种音色：
-- `earth`: lowpass 140Hz
-- `water`: lowpass 550Hz
-- `fire`: bandpass 800Hz
-- `wind`: lowpass + 控制速率频率摆动
-- `void`: highpass 3500Hz
-- 使用 `GainNode` 承担总音量与平滑启停。
+- 默认优先使用本地自然采样素材：
+  - `assets/audio/ambient/stream.mp3`
+  - `assets/audio/ambient/light-rain.mp3`
+  - `assets/audio/ambient/rain.mp3`
+  - `assets/audio/ambient/wind.mp3`
+  - `assets/audio/ambient/thunder-rain.mp3`
+- 采样可用时：`AudioBufferSourceNode` 循环播放 + `GainNode` 统一音量包络与 crossfade。
+- 采样不可用时：自动回退到合成噪声引擎（原滤波逻辑）。
 
 ### 5.2 提示音
-- 吸气：短促上扬水滴音。
-- 吐气：低频鼓面下潜音。
-- 屏息：双振荡器轻微失谐，营造钵音拍频。
+- 支持两种提示音模式：
+  - `sample`（默认）：真实采样素材
+    - `assets/audio/cues/inhale_qing.wav`
+    - `assets/audio/cues/hold_waterdrop.wav`
+    - `assets/audio/cues/exhale_drum.wav`
+  - `synth`：原合成提示音引擎（保留兜底）
+- 设置面板新增“提示音风格”切换，状态随本地设置持久化。
 
 ### 5.3 稳定性关键点
 - 切换环境音前先安全停止并断开旧节点，避免脏连接。
-- 噪声样本做 `Number.isFinite` 检查和 `[-1,1]` 限幅，避免滤波器输入异常。
-- `wind` 改为控制速率调制，避免 audio-rate 快速参数自动化导致 `Biquad bad state`。
+- 采样加载失败自动降级到合成引擎，避免会话启动失败。
+- `file://` 本地测试场景下跳过采样 fetch，避免浏览器协议限制导致控制台报错。
+- 合成噪声样本做 `Number.isFinite` 检查和 `[-1,1]` 限幅，避免滤波器输入异常。
+- 合成 `wind` 使用控制速率调制，避免 audio-rate 快速参数自动化导致 `Biquad bad state`。
 - 环境音切换采用短时 crossfade，并限制淡出队列仅保留最近一条，避免高频切换时节点堆积卡顿。
 
 ## 6. 视觉架构
