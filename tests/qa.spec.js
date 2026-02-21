@@ -121,7 +121,8 @@ test("TC-004 音频开关与音量调整有效", async ({ page }) => {
   await page.click("#start-btn");
   await page.waitForTimeout(800);
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    if (audioCtx && audioCtx.state === "suspended") await audioCtx.resume();
     document.getElementById("volume-slider").value = "80";
     document.getElementById("audio-toggle").checked = false;
     updateAudioVolume();
@@ -129,11 +130,12 @@ test("TC-004 音频开关与音量调整有效", async ({ page }) => {
   await page.waitForTimeout(800);
   const offSnap = await getSnapshot(page);
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    if (audioCtx && audioCtx.state === "suspended") await audioCtx.resume();
     document.getElementById("audio-toggle").checked = true;
     updateAudioVolume();
   });
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1500);
   const onSnap = await getSnapshot(page);
 
   expect(offSnap.ambientGain).not.toBeNull();

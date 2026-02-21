@@ -80,6 +80,13 @@
 
 仅当 `smoke + audio` 全绿，才允许继续开发合并；`stability` 可按日跑。
 
+线上补充：
+
+- 线上 smoke 自动化用例：`tests/online-smoke.spec.js`
+- CI 工作流：`.github/workflows/online-smoke.yml`
+- 触发方式：Vercel 部署成功自动触发，或 GitHub Actions 手动输入 URL 触发
+- 如果本地外网受限，先设置代理（示例：`http://127.0.0.1:7897`）再执行 `npm run test:online-smoke`
+
 ## 6. 最小必要人工测试范围
 
 自动化通过后，仅保留以下人工检查：
@@ -102,4 +109,3 @@
 1. 增加音频波形快照存档，用于版本间对比（回归“变味”）。
 2. 建立缺陷分级与 SLA（P0 当天修复，P1 本周修复）。
 3. 生成趋势报表（近 7 天失败率、最常见失败用例）。
-
