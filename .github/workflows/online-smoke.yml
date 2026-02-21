@@ -39,16 +39,24 @@ jobs:
         shell: bash
         run: |
           URL="${{ github.event.inputs.target_url }}"
+          PROD_URL="https://zenbreath-wheat.vercel.app/"
+          # For deployment_status (from Vercel), prefer stable production domain.
+          # Temporary deployment URLs may return 401 in GitHub Actions context.
           if [ -z "$URL" ] || [ "$URL" = "null" ]; then
-            URL="${{ github.event.deployment_status.environment_url }}"
+            if [ "${{ github.event_name }}" = "deployment_status" ]; then
+              URL="$PROD_URL"
+            else
+              URL="${{ github.event.deployment_status.environment_url }}"
+            fi
           fi
           if [ -z "$URL" ] || [ "$URL" = "null" ]; then
             URL="${{ github.event.deployment_status.target_url }}"
           fi
           if [ -z "$URL" ] || [ "$URL" = "null" ]; then
-            URL="https://zenbreath-wheat.vercel.app/"
+            URL="$PROD_URL"
           fi
           echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "prod_url=$PROD_URL" >> $GITHUB_OUTPUT
           echo "Smoke target: $URL"
 
       - name: Install deps
@@ -58,15 +66,24 @@ jobs:
         run: npx playwright install chromium
 
       - name: Wait for URL readiness
+        id: readiness
         shell: bash
         run: |
           URL="${{ steps.target.outputs.url }}"
+          PROD_URL="${{ steps.target.outputs.prod_url }}"
           for i in {1..24}; do
-            if curl -fsSIL --max-time 10 "$URL" >/dev/null; then
-              echo "Target is ready: $URL"
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL")
+            if [ "$CODE" = "200" ] || [ "$CODE" = "301" ] || [ "$CODE" = "302" ]; then
+              echo "Target is ready: $URL (HTTP $CODE)"
+              echo "url=$URL" >> $GITHUB_OUTPUT
               exit 0
             fi
-            echo "Waiting target... attempt $i/24"
+            if [ "$CODE" = "401" ] && [ "$URL" != "$PROD_URL" ]; then
+              echo "Primary URL unauthorized (401), fallback to production domain: $PROD_URL"
+              URL="$PROD_URL"
+              continue
+            fi
+            echo "Waiting target... attempt $i/24 (HTTP $CODE)"
             sleep 5
           done
           echo "Target not ready: $URL"
@@ -74,7 +91,7 @@ jobs:
 
       - name: Run online smoke
         env:
-          TARGET_URL: ${{ steps.target.outputs.url }}
+          TARGET_URL: ${{ steps.readiness.outputs.url }}
         run: npx playwright test tests/online-smoke.spec.js --retries=1
 
       - name: Upload failure artifacts
