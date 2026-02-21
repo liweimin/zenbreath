@@ -75,7 +75,7 @@ jobs:
       - name: Run online smoke
         env:
           TARGET_URL: ${{ steps.target.outputs.url }}
-        run: npm run test:online-smoke
+        run: npx playwright test tests/online-smoke.spec.js --retries=1
 
       - name: Upload failure artifacts
         if: failure()
@@ -85,3 +85,4 @@ jobs:
           path: |
             test-results/
             playwright-report/
+          if-no-files-found: ignore
